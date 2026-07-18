@@ -64,9 +64,13 @@ export function useMidnightWallet() {
     return () => clearInterval(id);
   }, []);
 
-  const connect = useCallback(async (networkId = "preprod") => {
+  const connect = useCallback(async (preferredNetwork?: string) => {
     setIsConnecting(true);
     setState((s) => ({ ...s, error: null, status: "connecting" }));
+
+    const candidates = preferredNetwork
+      ? [preferredNetwork]
+      : ["mainnet", "preprod", "undeployed", "preview"];
 
     try {
       const wallet = resolveWallet();
@@ -76,7 +80,26 @@ export function useMidnightWallet() {
         );
       }
 
-      const api = await wallet.connect(networkId);
+      let api: ConnectedAPI | null = null;
+      let lastError: unknown = null;
+
+      for (const net of candidates) {
+        try {
+          api = await wallet.connect(net);
+          const cs = await api.getConnectionStatus();
+          if (cs.status === "connected") {
+            break;
+          }
+          api = null;
+        } catch (e) {
+          lastError = e;
+          api = null;
+        }
+      }
+
+      if (!api) {
+        throw lastError ?? new Error("Could not connect on any network.");
+      }
 
       const connectionStatus = await api.getConnectionStatus();
       if (connectionStatus.status !== "connected") {
