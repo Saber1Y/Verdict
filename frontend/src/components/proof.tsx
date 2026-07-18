@@ -3,17 +3,17 @@ export function Proof() {
     <section id="proof" className="border-t border-card-border py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">
+          <h2 data-aos="fade-up" className="font-heading text-3xl font-bold md:text-4xl">
             See exactly what&apos;s disclosed — and what isn&apos;t.
           </h2>
-          <p className="mt-4 text-muted">
+          <p data-aos="fade-up" data-aos-delay="100" className="mt-4 text-muted">
             Every verdict is a real transaction. Here&apos;s what a proof looks like on-chain:
             the verdict and metadata are public; the balance that backs it never is.
           </p>
         </div>
 
         {/* Transaction proof card */}
-        <div className="mx-auto mt-12 max-w-2xl rounded-xl border border-card-border bg-card p-8">
+        <div data-aos="fade-up" data-aos-delay="200" className="mx-auto mt-12 max-w-2xl rounded-xl border border-card-border bg-card p-8">
           <div className="flex items-center justify-between">
             <span className="rounded-full border border-card-border bg-background px-3 py-1 font-mono text-xs text-muted">
               tx #4471
