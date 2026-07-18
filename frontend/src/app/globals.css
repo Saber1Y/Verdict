@@ -50,3 +50,80 @@ body {
 .animate-dash-flow {
   animation: dash-flow 1s linear infinite;
 }
+
+@keyframes atom-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-40px) scale(1.5);
+    opacity: 1;
+  }
+}
+
+@keyframes atom-orbit-0 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translate(60px, -80px) scale(1.3);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(120px, 0) scale(0.7);
+    opacity: 0.4;
+  }
+  75% {
+    transform: translate(60px, 80px) scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+}
+
+@keyframes atom-orbit-1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+  25% {
+    transform: translate(-70px, -60px) scale(0.8);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-140px, 0) scale(1.4);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-70px, 60px) scale(0.9);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes atom-orbit-2 {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0.4;
+  }
+  33% {
+    transform: translate(50px, -90px);
+    opacity: 0.9;
+  }
+  66% {
+    transform: translate(-50px, -45px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.4;
+  }
+}

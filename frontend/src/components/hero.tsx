@@ -8,6 +8,36 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_#031A16_0%,_transparent_50%)]" />
       <div className="pointer-events-none absolute top-1/4 left-1/2 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-violet/5 blur-[120px]" />
 
+      {/* Floating atom particles */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute h-1 w-1 rounded-full"
+            style={{
+              background: i % 3 === 0 ? "#6E5BFF" : i % 3 === 1 ? "#00D4B5" : "#7A7F8E",
+              top: `${(i * 7 + 13) % 100}%`,
+              left: `${(i * 11 + 5) % 100}%`,
+              animation: `atom-float ${4 + (i % 3) * 2}s ease-in-out ${i * 0.4}s infinite`,
+              opacity: 0.5 + (i % 3) * 0.15,
+            }}
+          />
+        ))}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={`orbit-${i}`}
+            className="absolute h-2 w-2 rounded-full"
+            style={{
+              background: i % 2 === 0 ? "#6E5BFF" : "#00D4B5",
+              top: `${45 + i * 2}%`,
+              left: `${30 + i * 7}%`,
+              animation: `atom-orbit-${i % 3} ${8 + i * 1.5}s linear infinite`,
+              opacity: 0.4,
+            }}
+          />
+        ))}
+      </div>
+
       <div className="relative mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-4xl text-center">
           <span
