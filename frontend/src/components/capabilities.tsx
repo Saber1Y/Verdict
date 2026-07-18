@@ -30,9 +30,11 @@ export function Capabilities() {
     <section className="py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-16 grid gap-6 md:grid-cols-2">
-          {CAPABILITIES.map((c) => (
+          {CAPABILITIES.map((c, i) => (
             <div
               key={c.num}
+              data-aos="fade-up"
+              data-aos-delay={i * 100}
               className="group rounded-xl border border-card-border bg-card p-8 transition-colors hover:border-violet/30"
             >
               <span className="font-mono text-3xl font-semibold text-violet/40 md:text-4xl">
