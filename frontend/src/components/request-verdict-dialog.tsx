@@ -53,7 +53,7 @@ export function RequestVerdictDialog({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative mx-4 w-full max-w-lg rounded-xl border border-card-border bg-card p-8 shadow-2xl">
+      <div className="relative mx-4 w-full max-w-xl rounded-xl border border-card-border bg-card p-8 shadow-2xl">
         {/* Close */}
         <button
           onClick={onClose}
@@ -253,7 +253,7 @@ export function RequestVerdictDialog({
               <div className="mt-4 grid gap-3">
                 <Field label="Threshold" value={`$${Number(threshold).toLocaleString()}`} />
                 <Field label="Counterparty" value={counterparty} />
-                <Field label="Transaction ID" value={result.txId ?? "pending"} mono />
+                <Field label="Transaction ID" value={result.txId ?? "pending"} mono copyable />
                 <Field label="Block height" value={result.blockHeight ? `#${result.blockHeight}` : "pending"} />
               </div>
 
@@ -312,15 +312,40 @@ function Field({
   label,
   value,
   mono,
+  copyable,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  copyable?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(async () => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [value]);
   return (
     <div className="flex items-center justify-between border-b border-card-border pb-2">
       <span className="text-xs text-muted">{label}</span>
-      <span className={`text-xs ${mono ? "font-mono" : ""}`}>{value}</span>
+      <span className={`flex items-center gap-1.5 break-all text-right text-xs ${mono ? "font-mono" : ""}`}>
+        {value}
+        {copyable && (
+          <button onClick={handleCopy} className="shrink-0 text-muted transition-colors hover:text-teal" title="Copy">
+            {copied ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 7l3 3 5-5" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="4" width="8" height="8" rx="1" />
+                <path d="M10 4V3a1 1 0 00-1-1H3a1 1 0 00-1 1v6a1 1 0 001 1h1" />
+              </svg>
+            )}
+          </button>
+        )}
+      </span>
     </div>
   );
 }

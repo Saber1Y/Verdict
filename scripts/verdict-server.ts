@@ -104,16 +104,40 @@ async function createProviders(walletCtx: WalletContext) {
 
 // ─── Server ──────────────────────────────────────────────────────
 
+const HISTORY_FILE = path.resolve(root, '.verdict-history.json');
+
+function readHistory(): any[] {
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
+    }
+  } catch { /* ignore corrupt file */ }
+  return [];
+}
+
+function appendHistory(entry: any) {
+  const history = readHistory();
+  history.push({ ...entry, timestamp: Date.now() });
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
 const PORT = parseInt(process.env.VERDICT_API_PORT || '3456', 10);
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // GET /history — returns all past verdicts
+  if (req.method === 'GET' && req.url === '/history') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(readHistory()));
     return;
   }
 
@@ -176,6 +200,15 @@ const server = http.createServer(async (req, res) => {
     })();
 
     console.log(`  ✅ Verdict submitted: txId=${tx.public?.txId} verdict_passed=${verdictPassed}`);
+
+    appendHistory({
+      dealId,
+      threshold,
+      counterparty,
+      verdictPassed,
+      txId: tx.public?.txId ?? null,
+      blockHeight: tx.public?.blockHeight ?? null,
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

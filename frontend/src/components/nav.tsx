@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Architecture", href: "#architecture" },
   { label: "Proof", href: "#proof" },
+  { label: "History", href: "/history" },
 ];
 
 export function Nav() {
