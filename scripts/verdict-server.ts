@@ -164,9 +164,11 @@ const server = http.createServer(async (req, res) => {
     await persistWalletState(network, walletCtx);
     await walletCtx.wallet.stop();
 
-    const verdictPassed = (() => {
+    const verdictPassed = await (async () => {
       try {
-        const ledgerState = VerdictContract.ledger(tx.public?.contractState?.data);
+        const contractState = await providers.publicDataProvider.queryContractState(deployment.address);
+        if (!contractState) return null;
+        const ledgerState = VerdictContract.ledger(contractState.data);
         return ledgerState.verdict_passed === 1n;
       } catch {
         return null;
