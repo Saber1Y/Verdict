@@ -26,15 +26,15 @@ export function HowItWorks() {
     <section id="how-it-works" className="border-t border-card-border py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">How it works</h2>
-          <p className="mt-4 text-muted">
+          <h2 data-aos="fade-up" className="font-heading text-3xl font-bold md:text-4xl">How it works</h2>
+          <p data-aos="fade-up" data-aos-delay="100" className="mt-4 text-muted">
             Four steps from deal creation to on-chain verdict — with the privacy boundary intact at every stage.
           </p>
         </div>
 
         <div className="mt-16 grid gap-8 md:grid-cols-4">
-          {STEPS.map((step) => (
-            <div key={step.num} className="relative">
+          {STEPS.map((step, i) => (
+            <div key={step.num} data-aos="fade-up" data-aos-delay={i * 150} className="relative">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-card-border bg-card font-mono text-lg font-semibold text-violet">
                 {step.num}
               </div>
