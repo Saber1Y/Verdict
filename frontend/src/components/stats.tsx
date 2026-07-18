@@ -18,8 +18,8 @@ export function Stats() {
     <section className="border-t border-card-border py-20 md:py-28">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-10 text-center md:grid-cols-3">
-          {STATS.map((s) => (
-            <div key={s.label}>
+          {STATS.map((s, i) => (
+            <div key={s.label} data-aos="fade-up" data-aos-delay={i * 150}>
               <span className="font-heading text-5xl font-bold text-teal md:text-6xl">
                 {s.value}
               </span>
