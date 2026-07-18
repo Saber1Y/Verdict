@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Sora, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { AOSInit } from "@/components/aos-init";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -34,6 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${sora.variable} ${inter.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
+      <AOSInit />
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
       </body>
