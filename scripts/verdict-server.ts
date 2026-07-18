@@ -141,6 +141,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /balance — returns wallet tNight balance
+  if (req.method === 'GET' && req.url === '/balance') {
+    try {
+      const walletCtx = await createWallet({ network, networkConfig, seed: SEED });
+      const state = await walletCtx.wallet.waitForSyncedState();
+      const balance = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
+      const dustBal = state.dust.balance(new Date());
+      await walletCtx.wallet.stop();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        tNight: balance.toString(),
+        tNightFormatted: balance.toLocaleString(),
+        dust: dustBal.toString(),
+      }));
+    } catch (err: any) {
+      console.error('  ❌ Balance error:', err);
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   if (req.method !== 'POST' || !req.url?.startsWith('/verdict')) {
     res.writeHead(404);
     res.end(JSON.stringify({ error: 'Not found' }));

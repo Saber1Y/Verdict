@@ -4,6 +4,7 @@ import { Capabilities } from "@/components/capabilities";
 import { HowItWorks } from "@/components/how-it-works";
 import { Architecture } from "@/components/architecture";
 import { Stats } from "@/components/stats";
+import { BalanceCheck } from "@/components/balance-check";
 import { Proof } from "@/components/proof";
 import { Transparency } from "@/components/transparency";
 import { Footer } from "@/components/footer";
@@ -19,6 +20,7 @@ export default function Home() {
         <HowItWorks />
         <Architecture />
         <Stats />
+        <BalanceCheck />
         <Proof />
         <Transparency />
       </main>

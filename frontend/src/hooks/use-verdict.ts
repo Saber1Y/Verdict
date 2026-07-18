@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export type VerdictRequest = {
   dealId: string;
@@ -12,6 +12,8 @@ export type VerdictRequest = {
 export type VerdictResult = {
   success: boolean;
   verdictPassed: boolean | null;
+  threshold?: number;
+  counterparty?: string;
   txId: string | null;
   blockHeight: number | null;
   dealId: string;
@@ -79,6 +81,30 @@ export function useVerdict() {
   }, []);
 
   return { step, result, error, submitVerdict, reset };
+}
+
+export function useLatestVerdict() {
+  const [latest, setLatest] = useState<VerdictResult | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const VERDICT_API = process.env.NEXT_PUBLIC_VERDICT_API || "http://localhost:3456";
+      const res = await fetch(`${VERDICT_API}/history`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const entries: VerdictResult[] = await res.json();
+      setLatest(entries.length > 0 ? entries[entries.length - 1] : null);
+    } catch {
+      setLatest(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return { latest, loading, refresh };
 }
 
 function delay(ms: number) {

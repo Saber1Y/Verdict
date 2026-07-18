@@ -1,18 +1,20 @@
+const CONTRACT_ADDRESS = "97a1ce5a9d23d11fe7de0515e1e06d9223d1ff52c5d128af6dd61b043b5434c3";
+
 const LINKS = [
   {
     title: "Deployed contract",
-    desc: "Midnight testnet explorer",
-    href: "#",
+    desc: "Midnight local devnet",
+    href: `https://explorer.local.midnight.network/contracts/${CONTRACT_ADDRESS}`,
   },
   {
     title: "Sample verdict",
-    desc: "Transaction #4471",
-    href: "#",
+    desc: "Verify any tx hash on the Midnight explorer",
+    href: `https://explorer.local.midnight.network/transactions`,
   },
   {
     title: "GitHub repo",
-    desc: "Source and proof server",
-    href: "#",
+    desc: "Source, circuit, and proof server",
+    href: "https://github.com/0xSaber/verdict",
   },
 ];
 
