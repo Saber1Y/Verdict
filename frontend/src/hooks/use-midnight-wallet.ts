@@ -6,53 +6,62 @@ import type { InitialAPI, ConnectedAPI } from "@midnight-ntwrk/dapp-connector-ap
 
 type WalletState = {
   status: "disconnected" | "connecting" | "connected";
-  wallets: InitialAPI[];
   connectedApi: ConnectedAPI | null;
   address: string | null;
+  shieldedAddress: string | null;
   networkId: string | null;
   walletName: string | null;
   error: string | null;
 };
 
-const POLL_INTERVAL = 200;
-const POLL_TIMEOUT = 8000;
+const POLL_INTERVAL = 300;
+const POLL_TIMEOUT = 6000;
 
-function enumerateWallets(): InitialAPI[] {
-  if (typeof window === "undefined") return [];
-  return Object.values(window.midnight ?? {});
+/**
+ * Resolve the first available Midnight wallet.
+ * Per the official docs, Lace injects at `window.midnight?.mnLace`.
+ * We try that first, then fall back to enumerating all injected wallets.
+ */
+function resolveWallet(): InitialAPI | undefined {
+  if (typeof window === "undefined") return undefined;
+  // Prefer Lace (official Midnight wallet)
+  if (window.midnight?.mnLace) return window.midnight.mnLace;
+  // Fall back to any other injected wallet
+  const wallets = Object.values(window.midnight ?? {});
+  return wallets[0];
 }
 
 export function useMidnightWallet() {
   const [state, setState] = useState<WalletState>({
     status: "disconnected",
-    wallets: [],
     connectedApi: null,
     address: null,
+    shieldedAddress: null,
     networkId: null,
     walletName: null,
     error: null,
   });
 
   const [isConnecting, setIsConnecting] = useState(false);
+  const [walletDetected, setWalletDetected] = useState(false);
   const connectedApiRef = useRef<ConnectedAPI | null>(null);
 
+  // Poll for wallet injection (extensions may load after the page)
   useEffect(() => {
-    const wallets = enumerateWallets();
-    if (wallets.length > 0) {
-      setState((s) => ({ ...s, wallets }));
+    if (resolveWallet()) {
+      setWalletDetected(true);
       return;
     }
-
     const start = Date.now();
-    const interval = setInterval(() => {
-      const found = enumerateWallets();
-      if (found.length > 0 || Date.now() - start > POLL_TIMEOUT) {
-        clearInterval(interval);
-        setState((s) => ({ ...s, wallets: found }));
+    const id = setInterval(() => {
+      if (resolveWallet()) {
+        setWalletDetected(true);
+        clearInterval(id);
+      } else if (Date.now() - start > POLL_TIMEOUT) {
+        clearInterval(id);
       }
     }, POLL_INTERVAL);
-
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, []);
 
   const connect = useCallback(async (networkId = "preprod") => {
@@ -60,29 +69,31 @@ export function useMidnightWallet() {
     setState((s) => ({ ...s, error: null, status: "connecting" }));
 
     try {
-      const wallets = enumerateWallets();
-      if (wallets.length === 0) {
-        throw new Error("No Midnight wallet found. Install Midnight Lace or another compatible wallet.");
+      const wallet = resolveWallet();
+      if (!wallet) {
+        throw new Error(
+          "No Midnight wallet found. Please install Midnight Lace or another compatible wallet."
+        );
       }
 
-      const wallet = wallets[0];
       const api = await wallet.connect(networkId);
 
-      const { unshieldedAddress } = await api.getUnshieldedAddress();
-      const status = await api.getConnectionStatus();
-
-      if (status.status !== "connected") {
-        throw new Error("Wallet connection rejected.");
+      const connectionStatus = await api.getConnectionStatus();
+      if (connectionStatus.status !== "connected") {
+        throw new Error("Wallet connection rejected by user.");
       }
+
+      const { unshieldedAddress } = await api.getUnshieldedAddress();
+      const shielded = await api.getShieldedAddresses();
 
       connectedApiRef.current = api;
 
       setState({
         status: "connected",
-        wallets,
         connectedApi: api,
         address: unshieldedAddress,
-        networkId: status.networkId,
+        shieldedAddress: shielded.shieldedAddress,
+        networkId: connectionStatus.networkId,
         walletName: wallet.name,
         error: null,
       });
@@ -98,25 +109,26 @@ export function useMidnightWallet() {
     connectedApiRef.current = null;
     setState({
       status: "disconnected",
-      wallets: state.wallets,
       connectedApi: null,
       address: null,
+      shieldedAddress: null,
       networkId: null,
       walletName: null,
       error: null,
     });
-  }, [state.wallets]);
+  }, []);
 
-  const truncate = useCallback((addr: string) => {
+  const truncateAddress = useCallback((addr: string) => {
     if (addr.length <= 14) return addr;
-    return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
+    return `${addr.slice(0, 10)}...${addr.slice(-6)}`;
   }, []);
 
   return {
     ...state,
     isConnecting,
+    walletDetected,
     connect,
     disconnect,
-    truncate,
+    truncateAddress,
   };
 }

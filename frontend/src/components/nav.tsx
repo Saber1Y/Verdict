@@ -11,7 +11,7 @@ const NAV_LINKS = [
 
 export function Nav() {
   const [open, setOpen] = useState(false);
-  const { status, address, walletName, networkId, error, isConnecting, connect, disconnect, truncate } =
+  const { status, address, walletName, networkId, error, isConnecting, walletDetected, connect, disconnect, truncateAddress } =
     useMidnightWallet();
 
   const walletPill = () => {
@@ -22,7 +22,7 @@ export function Nav() {
           className="inline-flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm transition-colors hover:bg-teal/10"
         >
           <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
-          <span className="font-mono text-teal">{truncate(address)}</span>
+          <span className="font-mono text-teal">{truncateAddress(address)}</span>
           {networkId && networkId !== "mainnet" && (
             <span className="rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
               {networkId}
@@ -112,7 +112,7 @@ export function Nav() {
             {status === "connected" && address && (
               <div className="flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2">
                 <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
-                <span className="font-mono text-sm text-teal">{truncate(address)}</span>
+                <span className="font-mono text-sm text-teal">{truncateAddress(address)}</span>
                 {networkId && networkId !== "mainnet" && (
                   <span className="ml-auto rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
                     {networkId}
