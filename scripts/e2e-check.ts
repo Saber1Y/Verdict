@@ -21,8 +21,12 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 // @ts-expect-error wallet sync requires WebSocket
 globalThis.WebSocket = WebSocket;
 
-// Must match the privateStateId used at deploy time (witness-free → empty state).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
+// Must match the privateStateId used at deploy time.
+const PRIVATE_STATE_ID = 'verdictPrivateState';
+
+type VerdictPrivateState = {
+  readonly balance: bigint;
+};
 
 // ─── Network configuration ─────────────────────────────────────────────────────
 
@@ -51,24 +55,31 @@ async function main() {
 
   // 2. Build wallet and providers
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
+  const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'verdict');
   const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
   if (!fs.existsSync(contractPath)) fail('Compiled contract missing — run `npm run compile`.');
-  const HelloWorld = await import(pathToFileURL(contractPath).href);
-  const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-    CompiledContract.withVacantWitnesses,
-    CompiledContract.withCompiledFileAssets(zkConfigPath),
-  );
+
+  const VerdictContract = await import(pathToFileURL(contractPath).href);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withWitnesses: any = CompiledContract.withWitnesses;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withAssets: any = CompiledContract.withCompiledFileAssets;
+
+  const step0 = CompiledContract.make('verdict', VerdictContract.Contract);
+  const step1 = withWitnesses(step0, {
+    actualBalance(context: any, threshold: bigint): [VerdictPrivateState, bigint] {
+      return [context.privateState, context.privateState.balance];
+    },
+  });
+  const compiledContract: any = withAssets(step1, zkConfigPath);
 
   const walletCtx = await createWallet({ network, networkConfig, seed: SEED });
   await walletCtx.wallet.waitForSyncedState();
-  // Persist the sync state — saves time on the next e2e-check invocation in CI
-  // when run against the same persistent wallet directory.
   await persistWalletState(network, walletCtx);
 
   const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
   const walletProvider = {
-    // Midnight.js 4.1.x returns the key objects (CoinPublicKey / EncPublicKey).
     getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
     getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
     async balanceTx() {
@@ -81,10 +92,8 @@ async function main() {
 
   const providers = {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'verdict-state',
       accountId: walletCtx.unshieldedKeystore.getBech32Address().toString(),
-      // SDK requires ≥16 chars. e2e-check is read-only so we don't expose
-      // the env-var override here — match the deploy script's local-devnet default.
       privateStoragePasswordProvider: () => 'Local-Devnet-Development-Placeholder-1',
     }),
     publicDataProvider: indexerPublicDataProvider(networkConfig.indexer, networkConfig.indexerWS),
@@ -98,27 +107,38 @@ async function main() {
   try {
     await findDeployedContract(providers, {
       contractAddress: deployment.address,
-      compiledContract: compiledContract as any,
+      compiledContract,
       privateStateId: PRIVATE_STATE_ID,
-      initialPrivateState: {},
+      initialPrivateState: { balance: 0n },
     });
   } catch (err: any) {
     await walletCtx.wallet.stop();
     fail(`findDeployedContract threw: ${err?.message ?? err}`);
   }
 
-  // 4. Read the on-chain contract state via the public data provider — proves
-  // the contract is indexed and queryable on the chain itself, not just that
-  // we know how to construct the local handle.
+  // 4. Read the on-chain contract state via the public data provider.
   const onChainState = await providers.publicDataProvider.queryContractState(deployment.address);
   if (!onChainState) {
     await walletCtx.wallet.stop();
     fail(`queryContractState returned null for ${deployment.address}`);
   }
 
+  // 5. Decode and validate the ledger state.
+  const ledgerState = VerdictContract.ledger(onChainState.data);
+  const validThreshold = typeof ledgerState.threshold === 'bigint';
+  const validVerdict = ledgerState.verdict_passed === 0n || ledgerState.verdict_passed === 1n;
+
   console.log(`✅ e2e-check passed`);
   console.log(`   contractAddress: ${deployment.address}`);
   console.log(`   network:         ${network}`);
+  console.log(`   ledger.deal_id:            ${ledgerState.deal_id}`);
+  console.log(`   ledger.threshold:          ${ledgerState.threshold.toString()}`);
+  console.log(`   ledger.counterparty:       ${ledgerState.counterparty_address}`);
+  console.log(`   ledger.timestamp:          ${new Date(Number(ledgerState.timestamp)).toISOString()}`);
+  console.log(`   ledger.description_hash:   ${ledgerState.description_hash}`);
+  console.log(`   ledger.verdict_passed:     ${ledgerState.verdict_passed === 1n ? 'YES' : 'NO'}`);
+  if (!validThreshold) fail('ledger.threshold is not a bigint');
+  if (!validVerdict) fail('ledger.verdict_passed has unexpected value');
 
   await walletCtx.wallet.stop();
   process.exit(0);

@@ -7,7 +7,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
-import { Buffer } from 'buffer';
 
 // Midnight SDK imports
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
@@ -23,17 +22,19 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 // @ts-expect-error Required for wallet sync
 globalThis.WebSocket = WebSocket;
 
-// Must match the privateStateId used at deploy time so the CLI reconnects to
-// the same private state. The hello-world contract has no witnesses (empty state).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
+// Must match the privateStateId used at deploy time.
+const PRIVATE_STATE_ID = 'verdictPrivateState';
+
+// Private-state type: the witness needs access to the actual balance.
+type VerdictPrivateState = {
+  readonly balance: bigint;
+};
 
 const { network, config: networkConfig } = resolveNetwork();
 const SEED = getOrCreateSeed(network);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
-
-// Load compiled contract
+const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'verdict');
 const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
 
 // Check if contract is compiled
@@ -42,29 +43,30 @@ if (!fs.existsSync(contractPath)) {
   process.exit(1);
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
+const VerdictContract = await import(pathToFileURL(contractPath).href);
 
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
-  CompiledContract.withCompiledFileAssets(zkConfigPath),
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const withWitnesses: any = CompiledContract.withWitnesses;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const withAssets: any = CompiledContract.withCompiledFileAssets;
+
+const step0 = CompiledContract.make('verdict', VerdictContract.Contract);
+const step1 = withWitnesses(step0, {
+  actualBalance(context: any, threshold: bigint): [VerdictPrivateState, bigint] {
+    return [context.privateState, context.privateState.balance];
+  },
+});
+const compiledContract: any = withAssets(step1, zkConfigPath);
 
 // ─── Providers ─────────────────────────────────────────────────────────────────
 
 async function createProviders(walletCtx: WalletContext) {
-  // The SDK requires the private-state password to be at least 16 characters.
-  // The default below is a placeholder for local devnet only — set a strong
-  // password via PRIVATE_STATE_PASSWORD when you move to a non-local target.
   const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Local-Devnet-Development-Placeholder-1';
 
   const walletProvider = {
-    // In Midnight.js 4.1.x the WalletProvider interface returns the key objects
-    // (CoinPublicKey / EncPublicKey) directly — no longer hex strings.
     getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
     getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
     async balanceTx(tx: any, ttl?: Date) {
-      // balanceUnboundTransaction -> finalizeRecipe is the complete balancing
-      // path in wallet-sdk 1.x; the earlier explicit signRecipe step is gone.
       const recipe = await walletCtx.wallet.balanceUnboundTransaction(
         tx,
         { shieldedSecretKeys: walletCtx.shieldedSecretKeys, dustSecretKey: walletCtx.dustSecretKey },
@@ -80,7 +82,7 @@ async function createProviders(walletCtx: WalletContext) {
 
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'verdict-state',
       accountId,
       privateStoragePasswordProvider: () => privateStatePassword,
     }),
@@ -96,7 +98,7 @@ async function createProviders(walletCtx: WalletContext) {
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║                   verdict CLI                           ║');
+  console.log('║                   Verdict CLI                            ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
   const rl = createInterface({ input: stdin, output: stdout });
@@ -138,9 +140,6 @@ async function main() {
     console.log(`  Balance: ${balance.toLocaleString()} tNight\n`);
 
     // Surface a faucet hint when a public-network wallet has 0 tNIGHT.
-    // Reads (option 2) work without funds, but writes (option 1) need DUST
-    // generated from registered NIGHT — without this hint the next failure
-    // mode is a confusing "Insufficient Funds" deep inside the tx builder.
     if (balance === 0n && network !== 'undeployed' && networkConfig.faucet) {
       const address = walletCtx.unshieldedKeystore.getBech32Address();
       console.log('  ⚠ Wallet has no tNight. Fund it from the faucet to send transactions:');
@@ -153,10 +152,10 @@ async function main() {
     const providers = await createProviders(walletCtx);
 
     const deployed: any = await findDeployedContract(providers, {
-      compiledContract: compiledContract as any,
+      compiledContract,
       contractAddress: deployment.address,
       privateStateId: PRIVATE_STATE_ID,
-      initialPrivateState: {},
+      initialPrivateState: { balance: 0n },
     });
 
     console.log('  ✅ Connected!\n');
@@ -165,8 +164,8 @@ async function main() {
     let running = true;
     while (running) {
       console.log('─── Menu ───────────────────────────────────────────────────────');
-      console.log('  1. Store a message');
-      console.log('  2. Read current message');
+      console.log('  1. Run verifySolvency');
+      console.log('  2. Read current verdict');
       console.log('  3. Check wallet balance');
       console.log('  4. Exit\n');
 
@@ -174,11 +173,25 @@ async function main() {
 
       switch (choice.trim()) {
         case '1': {
-          const message = await rl.question('  Enter your message: ');
-          console.log('\n  Submitting transaction (this may take 30-60 seconds)...');
+          const dealId = await rl.question('  Deal ID: ');
+          const thresholdStr = await rl.question('  Threshold (balance in tNight): ');
+          const counterparty = await rl.question('  Counterparty address: ');
+          const descHash = await rl.question('  Description hash: ');
+
+          const threshold = BigInt(thresholdStr);
+          const timestamp = BigInt(Date.now());
+          const privateState = { balance: 0n };
+
+          console.log('\n  Submitting verifySolvency transaction (this may take 30-60 seconds)...');
           try {
-            const tx = await deployed.callTx.storeMessage(message);
-            console.log(`\n  ✅ Message stored: "${message}"`);
+            const tx = await deployed.callTx.verifySolvency(
+              dealId,
+              threshold,
+              counterparty,
+              timestamp,
+              descHash,
+            );
+            console.log(`\n  ✅ verifySolvency submitted!`);
             console.log(`  Transaction ID: ${tx.public.txId}`);
             console.log(`  Block height: ${tx.public.blockHeight}\n`);
           } catch (error) {
@@ -188,15 +201,19 @@ async function main() {
         }
 
         case '2': {
-          console.log('\n  Reading message from blockchain...');
+          console.log('\n  Reading verdict from blockchain...');
           try {
             const contractState = await providers.publicDataProvider.queryContractState(deployment.address);
             if (contractState) {
-              const ledgerState = HelloWorld.ledger(contractState.data);
-              const message = Buffer.from(ledgerState.message).toString();
-              console.log(`\n  📋 Current message: "${message}"\n`);
+              const ledgerState = VerdictContract.ledger(contractState.data);
+              console.log(`\n  Deal ID:            ${ledgerState.deal_id}`);
+              console.log(`  Threshold:          ${ledgerState.threshold.toString()}`);
+              console.log(`  Counterparty:       ${ledgerState.counterparty_address}`);
+              console.log(`  Timestamp:          ${new Date(Number(ledgerState.timestamp)).toISOString()}`);
+              console.log(`  Description Hash:   ${ledgerState.description_hash}`);
+              console.log(`  Verdict Passed:     ${ledgerState.verdict_passed === 1n ? 'YES' : 'NO'}\n`);
             } else {
-              console.log('\n  📋 No message found (contract state empty)\n');
+              console.log('\n  No verdict state found (contract state empty)\n');
             }
           } catch (error) {
             console.error('\n  ❌ Failed:', error instanceof Error ? error.message : error);
@@ -216,7 +233,7 @@ async function main() {
 
         case '4':
           running = false;
-          console.log('\n  👋 Goodbye!\n');
+          console.log('\n  Goodbye!\n');
           break;
 
         default:

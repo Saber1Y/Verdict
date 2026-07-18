@@ -23,23 +23,20 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 // @ts-expect-error Required for wallet sync
 globalThis.WebSocket = WebSocket;
 
-// Identifier under which this contract's private state is stored. The
-// hello-world contract has no witnesses, so its private state is empty ({}).
-const PRIVATE_STATE_ID = 'helloWorldPrivateState';
+// Private-state type: the witness needs access to the actual balance.
+type VerdictPrivateState = {
+  readonly balance: bigint;
+};
+
+// Identifier under which this contract's private state is stored.
+const PRIVATE_STATE_ID = 'verdictPrivateState';
 
 // ─── Network configuration ─────────────────────────────────────────────────────
-//
-// Resolved from --network flag, .midnight-state.json, or defaulting to
-// 'undeployed' (local devnet). Switch networks with: npm run network <name>
 
 const { network, config: networkConfig } = resolveNetwork();
 const SEED = getOrCreateSeed(network);
 
 // ─── Proof server readiness ────────────────────────────────────────────────────
-//
-// The proof-server image is distroless and has no shell, so it can't run a
-// container-side healthcheck. Poll it from the host before we submit anything
-// that needs proofs.
 
 async function waitForProofServer(maxAttempts = 60, delayMs = 2000): Promise<boolean> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -66,7 +63,7 @@ async function waitForProofServer(maxAttempts = 60, delayMs = 2000): Promise<boo
 // ─── Compiled contract loading ─────────────────────────────────────────────────
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
+const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'verdict');
 const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
 
 if (!fs.existsSync(contractPath)) {
@@ -74,29 +71,17 @@ if (!fs.existsSync(contractPath)) {
   process.exit(1);
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
-
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
-  CompiledContract.withCompiledFileAssets(zkConfigPath),
-);
+const VerdictContract = await import(pathToFileURL(contractPath).href);
 
 // ─── Providers ─────────────────────────────────────────────────────────────────
 
 async function createProviders(walletCtx: WalletContext) {
-  // The SDK requires the private-state password to be at least 16 characters.
-  // The default below is a placeholder for local devnet only — set a strong
-  // password via PRIVATE_STATE_PASSWORD when you move to a non-local target.
   const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Local-Devnet-Development-Placeholder-1';
 
   const walletProvider = {
-    // In Midnight.js 4.1.x the WalletProvider interface returns the key objects
-    // (CoinPublicKey / EncPublicKey) directly — no longer hex strings.
     getCoinPublicKey: () => walletCtx.shieldedSecretKeys.coinPublicKey,
     getEncryptionPublicKey: () => walletCtx.shieldedSecretKeys.encryptionPublicKey,
     async balanceTx(tx: any, ttl?: Date) {
-      // balanceUnboundTransaction -> finalizeRecipe is the complete balancing
-      // path in wallet-sdk 1.x; the earlier explicit signRecipe step is gone.
       const recipe = await walletCtx.wallet.balanceUnboundTransaction(
         tx,
         { shieldedSecretKeys: walletCtx.shieldedSecretKeys, dustSecretKey: walletCtx.dustSecretKey },
@@ -112,7 +97,7 @@ async function createProviders(walletCtx: WalletContext) {
 
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'verdict-state',
       accountId,
       privateStoragePasswordProvider: () => privateStatePassword,
     }),
@@ -153,7 +138,6 @@ async function main() {
   clearInterval(syncInterval);
   process.stdout.write('\r  ✓ Synced with network.                                      \n');
 
-  // Persist sync state now so a later deploy failure doesn't waste the sync work.
   await persistWalletState(network, walletCtx);
 
   const address = walletCtx.unshieldedKeystore.getBech32Address();
@@ -170,13 +154,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Faucet poll for public networks. The wallet has 0 tNIGHT until the user
-  // funds the address from the network's faucet. The display balance is
-  // authoritative here (unlike DUST, tNIGHT shows up immediately once the
-  // faucet tx lands).
   if (network !== 'undeployed' && networkConfig.faucet) {
-    // Same balance idiom used by check-balance.ts:
-    //   state.unshielded.balances[unshieldedToken().raw] ?? 0n
     const initialBalance = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(
       Rx.filter((s) => s.isSynced),
     ));
@@ -221,10 +199,6 @@ async function main() {
   );
   if (unregisteredUtxos.length > 0) {
     console.log(`  Registering ${unregisteredUtxos.length} NIGHT UTXOs for DUST generation...`);
-    // The signDustRegistration callback (3rd arg) already produces a recipe
-    // with N signatures matching N inputs. Do NOT call signRecipe again — that
-    // would double-sign and the chain rejects with InputsSignaturesLengthMismatch
-    // (Custom error 192). Matches upstream example-counter and example-bboard.
     const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
       unregisteredUtxos,
       walletCtx.unshieldedKeystore.getPublicKey(),
@@ -261,39 +235,46 @@ async function main() {
   console.log('  Setting up providers...');
   const providers = await createProviders(walletCtx);
 
-  // The wallet's reported DUST balance is a *time-projection* of what its
-  // registered NIGHT will eventually generate; the tx-builder spends only
-  // what the next block's timestamp accounts for, which lags wall-clock by
-  // ~1 block on a fresh devnet. Sleeping ~1 block-time before attempt 1
-  // closes that gap in the common case; the retry loop covers outliers.
+  // Build compiled contract and attach witnesses + ZK assets path.
+  // The `any` casts are unavoidable: the Effect-based overloads for
+  // `withWitnesses` / `withCompiledFileAssets` can't narrow union context tags
+  // at the type level. The hello-world CLI avoids this via `withVacantWitnesses`.
+  const initialPrivateState: VerdictPrivateState = { balance: 0n };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withWitnesses: any = CompiledContract.withWitnesses;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withAssets: any = CompiledContract.withCompiledFileAssets;
+
+  const step0 = CompiledContract.make('verdict', VerdictContract.Contract);
+  const step1 = withWitnesses(step0, {
+    actualBalance(context: any, threshold: bigint): [VerdictPrivateState, bigint] {
+      return [context.privateState, context.privateState.balance];
+    },
+  });
+  const compiledContract: any = withAssets(step1, zkConfigPath);
+
+  if (!compiledContract.tag) {
+    throw new Error('CompiledContract construction produced invalid object');
+  }
+
   process.stdout.write('  Generating DUST...');
   await new Promise((r) => setTimeout(r, 6000));
   process.stdout.write(' done.\n');
 
   console.log('  Deploying contract...\n');
 
-  // Fallback timing. The 6s pre-pause above handles the common case; this
-  // loop covers genuine outliers (slow blocks, proof-server worker-pool
-  // settling). Earlier 2s retries caused CI flakes where attempt 2's /prove
-  // hit the proof-server before it had drained attempt 1's state — 5s gives
-  // it room to settle between attempts. 20 × 5 = 100s total budget.
   const MAX_RETRIES = 20;
   const RETRY_DELAY_MS = 5000;
   let deployed: Awaited<ReturnType<typeof deployContract>> | undefined;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      // Midnight.js 4.1.x supplies private state via privateStateId +
-      // initialPrivateState (empty here — the hello-world contract has no
-      // witnesses). args is the contract constructor's arguments: empty for
-      // hello-world's no-arg constructor. (Statically-typed contracts can omit
-      // args entirely; this script loads the contract dynamically, so the
-      // conditional args type widens to any[] and an explicit [] is required.)
       deployed = await deployContract(providers, {
-        compiledContract: compiledContract as any,
+        compiledContract,
         args: [],
         privateStateId: PRIVATE_STATE_ID,
-        initialPrivateState: {},
+        initialPrivateState,
       });
       break;
     } catch (err: any) {
@@ -301,19 +282,11 @@ async function main() {
       const errCause = err?.cause?.message || err?.cause?.toString() || '';
       const fullError = `${errMsg} ${errCause}`;
 
-      // DUST shortage is the most common transient failure on a fresh devnet —
-      // check it BEFORE proof-server connectivity, because dust-balancing errors
-      // can surface through proof-server-shaped messages (the wallet talks to
-      // the proof-server while building the dust portion of the tx).
       const isDustShortage =
         fullError.includes('Not enough Dust') ||
         fullError.includes('Insufficient Funds') ||
         fullError.includes('could not balance dust');
 
-      // Quiet the first DUST-shortage retry: it's the expected race between
-      // wall-clock projection and block-timestamp accounting and the loud
-      // `Insufficient Funds: <huge number>` message scares first-time users.
-      // Real failures still get the full diagnostic from attempt 2 onward.
       if (!(isDustShortage && attempt === 1)) {
         console.error(`\n  Attempt ${attempt} error: ${errMsg}`);
         if (errCause && errCause !== errMsg) console.error(`  Cause: ${errCause}`);

@@ -1,0 +1,47 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+// Public ledger state — everything visible on-chain.
+export ledger deal_id: Opaque<"string">;
+export ledger threshold: Uint<64>;
+export ledger counterparty_address: Opaque<"string">;
+export ledger timestamp: Uint<64>;
+export ledger description_hash: Opaque<"string">;
+export ledger verdict_passed: Uint<1>;
+
+// Witness: returns the counterparty agent's real balance.
+// Called inside the circuit — never disclosed.
+witness actualBalance(threshold: Uint<64>): Uint<64>;
+
+// Helper: convert a boolean to Uint<1> without using a ternary.
+// Returns 1 when true, 0 when false.
+circuit boolToUint1(b: Boolean): Uint<1> {
+  if (b) {
+    return 1 as Uint<1>;
+  } else {
+    return 0 as Uint<1>;
+  }
+}
+
+// Circuit: compare private balance against public threshold.
+// The balance is obtained via a witness and is never disclosed.
+// Only the boolean result (passed/failed) and deal metadata reach the ledger.
+export circuit verifySolvency(
+  deal_id_arg: Opaque<"string">,
+  threshold_arg: Uint<64>,
+  counterparty_arg: Opaque<"string">,
+  timestamp_arg: Uint<64>,
+  description_hash_arg: Opaque<"string">,
+): [] {
+  deal_id = disclose(deal_id_arg);
+  threshold = disclose(threshold_arg);
+  counterparty_address = disclose(counterparty_arg);
+  timestamp = disclose(timestamp_arg);
+  description_hash = disclose(description_hash_arg);
+
+  const balance: Uint<64> = actualBalance(threshold_arg);
+  const passed: Boolean = balance >= threshold_arg;
+
+  verdict_passed = disclose(boolToUint1(passed));
+}
