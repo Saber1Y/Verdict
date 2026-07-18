@@ -2,25 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useMidnightWallet } from "@/hooks/use-midnight-wallet";
+import { useVerdict, type VerdictStep } from "@/hooks/use-verdict";
 
-type Step = "form" | "preparing" | "proving" | "balancing" | "submitting" | "done";
-
-type VerdictResult = {
-  dealId: string;
-  threshold: string;
-  counterparty: string;
-  verdict: boolean;
-  txHash: string;
-  blockHeight: number;
-};
-
-const STEP_MESSAGES: Record<Step, string> = {
-  form: "",
+const STEP_MESSAGES: Record<VerdictStep, string> = {
+  idle: "",
   preparing: "Preparing circuit...",
   proving: "Generating zero-knowledge proof...",
   balancing: "Balancing transaction with wallet...",
   submitting: "Submitting to the Midnight Network...",
   done: "",
+  error: "",
 };
 
 export function RequestVerdictDialog({
@@ -31,54 +22,34 @@ export function RequestVerdictDialog({
   onClose: () => void;
 }) {
   const { status: walletStatus, address, connect } = useMidnightWallet();
-  const [step, setStep] = useState<Step>("form");
-  const [result, setResult] = useState<VerdictResult | null>(null);
+  const { step, result, error, submitVerdict, reset: resetVerdict } = useVerdict();
   const [dealId, setDealId] = useState(`#${Math.floor(Math.random() * 9000 + 1000)}`);
   const [threshold, setThreshold] = useState("50000");
   const [counterparty, setCounterparty] = useState("0x3c1d...9a4f");
   const [description, setDescription] = useState("Solvency verification for Q3 settlement");
 
   const reset = useCallback(() => {
-    setStep("form");
-    setResult(null);
-  }, []);
+    resetVerdict();
+  }, [resetVerdict]);
 
   useEffect(() => {
     if (!open) reset();
   }, [open, reset]);
 
   const handleSubmit = async () => {
-    setStep("preparing");
-
-    // Simulate the proving pipeline with realistic delays
-    await delay(800);
-    setStep("proving");
-    await delay(1500);
-    setStep("balancing");
-    await delay(1000);
-    setStep("submitting");
-    await delay(1200);
-
-    // Derive deterministic result from the deal ID
-    const hash = simpleHash(dealId + threshold + counterparty);
-    const passed = hash % BigInt(2) === BigInt(0);
-
-    setResult({
+    await submitVerdict({
       dealId,
-      threshold: `$${Number(threshold).toLocaleString()}`,
+      threshold,
       counterparty,
-      verdict: passed,
-      txHash: `0x${(hash & BigInt("0xfffffffffffffff")).toString(16).padStart(16, "0")}`,
-      blockHeight: 8954321 + Math.floor(Number(hash % BigInt(100))),
+      descriptionHash: description,
     });
-    setStep("done");
   };
 
   if (!open) return null;
 
-  const isForm = step === "form";
+  const isForm = step === "idle" || step === "error";
   const isDone = step === "done";
-  const isActive = !isForm && !isDone;
+  const isActive = step !== "idle" && step !== "done" && step !== "error";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -187,7 +158,7 @@ export function RequestVerdictDialog({
             </p>
 
             <div className="mt-8 grid gap-3">
-              {(["preparing", "proving", "balancing", "submitting"] as Step[]).map((s) => {
+              {(["preparing", "proving", "balancing", "submitting"] as VerdictStep[]).map((s) => {
                 const order = ["preparing", "proving", "balancing", "submitting"];
                 const idx = order.indexOf(s);
                 const currentIdx = order.indexOf(step);
@@ -250,38 +221,22 @@ export function RequestVerdictDialog({
               The zk-proof was verified on-chain. The balance that backs it never was.
             </p>
 
-            <div
-              className={`mt-6 rounded-xl border p-6 ${
-                result.verdict
-                  ? "border-teal/30 bg-teal/[0.03]"
-                  : "border-red-500/20 bg-red-500/[0.03]"
-              }`}
-            >
+            <div className="mt-6 rounded-xl border border-teal/30 bg-teal/[0.03] p-6">
               <div className="flex items-center justify-between">
                 <span className="rounded-full border border-card-border bg-background px-3 py-1 font-mono text-xs text-muted">
                   {result.dealId}
                 </span>
-                <span
-                  className={`flex items-center gap-2 font-mono text-xs ${
-                    result.verdict ? "text-teal" : "text-red-400"
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      result.verdict
-                        ? "bg-teal shadow-[0_0_6px_#00D4B5]"
-                        : "bg-red-400 shadow-[0_0_6px_#ef4444]"
-                    }`}
-                  ></span>
-                  {result.verdict ? "SOLVENT" : "INSUFFICIENT"}
+                <span className="flex items-center gap-2 font-mono text-xs text-teal">
+                  <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]"></span>
+                  SUBMITTED
                 </span>
               </div>
 
               <div className="mt-4 grid gap-3">
-                <Field label="Threshold" value={result.threshold} />
-                <Field label="Counterparty" value={result.counterparty} />
-                <Field label="Transaction hash" value={result.txHash} mono />
-                <Field label="Block height" value={`#${result.blockHeight}`} />
+                <Field label="Threshold" value={`$${Number(threshold).toLocaleString()}`} />
+                <Field label="Counterparty" value={counterparty} />
+                <Field label="Transaction ID" value={result.txId ?? "pending"} mono />
+                <Field label="Block height" value={result.blockHeight ? `#${result.blockHeight}` : "pending"} />
               </div>
 
               <div className="mt-4 rounded-lg border border-dashed border-red-500/20 bg-red-500/[0.03] p-3">
@@ -312,6 +267,29 @@ export function RequestVerdictDialog({
             </div>
           </>
         )}
+
+        {step === "error" && (
+          <>
+            <h2 className="font-heading text-xl font-bold text-red-400">Submission Failed</h2>
+            <p className="mt-1 text-sm text-muted">
+              {error || "An unknown error occurred during verification."}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleSubmit}
+                className="flex-1 rounded-lg bg-violet px-4 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110"
+              >
+                Retry
+              </button>
+              <button
+                onClick={onClose}
+                className="rounded-lg border border-card-border px-4 py-2.5 text-sm transition-colors hover:border-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -332,17 +310,4 @@ function Field({
       <span className={`text-xs ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
   );
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function simpleHash(str: string): bigint {
-  let h = BigInt(0);
-  for (let i = 0; i < str.length; i++) {
-    h = (h << BigInt(5)) - h + BigInt(str.charCodeAt(i));
-    h &= BigInt("0xffffffffffffffff");
-  }
-  return h;
 }
