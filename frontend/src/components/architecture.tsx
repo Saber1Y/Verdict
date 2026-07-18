@@ -63,15 +63,15 @@ export function Architecture() {
     <section id="architecture" className="border-t border-card-border py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">Architecture</h2>
-          <p className="mt-4 text-muted">
+          <h2 data-aos="fade-up" className="font-heading text-3xl font-bold md:text-4xl">Architecture</h2>
+          <p data-aos="fade-up" data-aos-delay="100" className="mt-4 text-muted">
             The privacy boundary is the single most important line in the system —
             everything before it is local, everything after it is public.
           </p>
         </div>
 
         {/* Workflow canvas */}
-        <div className="mt-16">
+        <div data-aos="fade-up" data-aos-delay="200" className="mt-16">
           <WorkflowCanvas steps={STEPS} connections={CONNECTIONS} />
 
           {/* Privacy boundary callout */}
