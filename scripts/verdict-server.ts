@@ -23,6 +23,7 @@ type VerdictPrivateState = { readonly balance: bigint };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 
+import * as Rx from 'rxjs';
 import { createWallet, persistWalletState, unshieldedToken, type WalletContext } from '../src/wallet';
 import { resolveNetwork, getOrCreateSeed, getDeployment } from '../src/network';
 import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
@@ -139,7 +140,9 @@ const server = http.createServer(async (req, res) => {
     console.log(`  Verdict request: dealId=${dealId} threshold=${threshold} counterparty=${counterparty}`);
 
     const walletCtx = await createWallet({ network, networkConfig, seed: SEED });
-    await walletCtx.wallet.waitForSyncedState();
+    const state = await walletCtx.wallet.waitForSyncedState();
+    const balance = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
+    console.log(`  Wallet balance: ${balance.toLocaleString()} tNight`);
 
     const providers = await createProviders(walletCtx);
 
@@ -147,7 +150,7 @@ const server = http.createServer(async (req, res) => {
       compiledContract,
       contractAddress: deployment.address,
       privateStateId: PRIVATE_STATE_ID,
-      initialPrivateState: { balance: 0n },
+      initialPrivateState: { balance },
     });
 
     const tx = await deployed.callTx.verifySolvency(
@@ -161,11 +164,21 @@ const server = http.createServer(async (req, res) => {
     await persistWalletState(network, walletCtx);
     await walletCtx.wallet.stop();
 
-    console.log(`  ✅ Verdict submitted: txId=${tx.public?.txId}`);
+    const verdictPassed = (() => {
+      try {
+        const ledgerState = VerdictContract.ledger(tx.public?.contractState?.data);
+        return ledgerState.verdict_passed === 1n;
+      } catch {
+        return null;
+      }
+    })();
+
+    console.log(`  ✅ Verdict submitted: txId=${tx.public?.txId} verdict_passed=${verdictPassed}`);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
+      verdictPassed,
       txId: tx.public?.txId ?? null,
       blockHeight: tx.public?.blockHeight ?? null,
       dealId,

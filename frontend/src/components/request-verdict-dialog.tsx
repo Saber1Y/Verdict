@@ -221,14 +221,32 @@ export function RequestVerdictDialog({
               The zk-proof was verified on-chain. The balance that backs it never was.
             </p>
 
-            <div className="mt-6 rounded-xl border border-teal/30 bg-teal/[0.03] p-6">
+            <div className={`mt-6 rounded-xl border p-6 ${
+              result.verdictPassed === true
+                ? "border-teal/30 bg-teal/[0.03]"
+                : result.verdictPassed === false
+                  ? "border-red-500/20 bg-red-500/[0.03]"
+                  : "border-teal/30 bg-teal/[0.03]"
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="rounded-full border border-card-border bg-background px-3 py-1 font-mono text-xs text-muted">
                   {result.dealId}
                 </span>
-                <span className="flex items-center gap-2 font-mono text-xs text-teal">
-                  <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]"></span>
-                  SUBMITTED
+                <span className={`flex items-center gap-2 font-mono text-xs ${
+                  result.verdictPassed === true
+                    ? "text-teal"
+                    : result.verdictPassed === false
+                      ? "text-red-400"
+                      : "text-teal"
+                }`}>
+                  <span className={`h-2 w-2 rounded-full ${
+                    result.verdictPassed === true
+                      ? "bg-teal shadow-[0_0_6px_#00D4B5]"
+                      : result.verdictPassed === false
+                        ? "bg-red-400 shadow-[0_0_6px_#ef4444]"
+                        : "bg-teal shadow-[0_0_6px_#00D4B5]"
+                  }`}></span>
+                  {result.verdictPassed === true ? "SOLVENT" : result.verdictPassed === false ? "INSUFFICIENT" : "SUBMITTED"}
                 </span>
               </div>
 

@@ -11,6 +11,7 @@ export type VerdictRequest = {
 
 export type VerdictResult = {
   success: boolean;
+  verdictPassed: boolean | null;
   txId: string | null;
   blockHeight: number | null;
   dealId: string;
