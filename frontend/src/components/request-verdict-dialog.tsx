@@ -257,15 +257,10 @@ export function RequestVerdictDialog({
                 <Field label="Block height" value={result.blockHeight ? `#${result.blockHeight}` : "pending"} />
               </div>
 
-              <div className="mt-4 rounded-lg border border-dashed border-red-500/20 bg-red-500/[0.03] p-3">
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 shrink-0 text-red-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 15L15 5M15 15L5 5" />
-                  </svg>
-                  <span className="text-xs text-muted">
-                    Balance: never disclosed &middot; never transmitted &middot; never logged
-                  </span>
-                </div>
+              <div className="mt-4 border-t border-card-border pt-4">
+                <p className="text-center text-xs leading-relaxed text-muted">
+                  Balance never disclosed &middot; never transmitted &middot; never logged
+                </p>
               </div>
             </div>
 
