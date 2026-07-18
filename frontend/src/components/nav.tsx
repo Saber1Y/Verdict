@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useMidnightWallet } from "@/hooks/use-midnight-wallet";
 
 const NAV_LINKS = [
   { label: "How it works", href: "#how-it-works" },
@@ -10,6 +11,48 @@ const NAV_LINKS = [
 
 export function Nav() {
   const [open, setOpen] = useState(false);
+  const { status, address, walletName, networkId, error, isConnecting, connect, disconnect, truncate } =
+    useMidnightWallet();
+
+  const walletPill = () => {
+    if (status === "connected" && address) {
+      return (
+        <button
+          onClick={disconnect}
+          className="inline-flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm transition-colors hover:bg-teal/10"
+        >
+          <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
+          <span className="font-mono text-teal">{truncate(address)}</span>
+          {networkId && networkId !== "mainnet" && (
+            <span className="rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
+              {networkId}
+            </span>
+          )}
+        </button>
+      );
+    }
+
+    if (isConnecting || status === "connecting") {
+      return (
+        <button
+          disabled
+          className="inline-flex cursor-wait items-center gap-2 rounded-lg border border-card-border px-4 py-2 text-sm text-muted"
+        >
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted border-t-transparent" />
+          Connecting
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => connect()}
+        className="rounded-lg border border-card-border px-4 py-2 text-sm transition-colors hover:border-muted"
+      >
+        Connect wallet
+      </button>
+    );
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-card-border bg-background/80 backdrop-blur-xl">
@@ -33,9 +76,7 @@ export function Nav() {
 
         {/* Desktop buttons */}
         <div className="hidden items-center gap-3 md:flex">
-          <button className="rounded-lg border border-card-border px-4 py-2 text-sm transition-colors hover:border-muted">
-            Connect wallet
-          </button>
+          {walletPill()}
           <button className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110">
             Request a verdict
           </button>
@@ -68,13 +109,47 @@ export function Nav() {
               </a>
             ))}
             <hr className="border-card-border" />
-            <button className="rounded-lg border border-card-border px-4 py-2 text-sm transition-colors hover:border-muted">
-              Connect wallet
-            </button>
+            {status === "connected" && address && (
+              <div className="flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
+                <span className="font-mono text-sm text-teal">{truncate(address)}</span>
+                {networkId && networkId !== "mainnet" && (
+                  <span className="ml-auto rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
+                    {networkId}
+                  </span>
+                )}
+              </div>
+            )}
+            {status === "connected" ? (
+              <button
+                onClick={() => { disconnect(); setOpen(false); }}
+                className="rounded-lg border border-card-border px-4 py-2 text-sm text-red-400 transition-colors hover:border-red-400/30"
+              >
+                Disconnect
+              </button>
+            ) : (
+              <button
+                onClick={() => { connect(); setOpen(false); }}
+                disabled={isConnecting || status === "connecting"}
+                className="rounded-lg border border-card-border px-4 py-2 text-sm transition-colors hover:border-muted disabled:cursor-wait disabled:text-muted"
+              >
+                {isConnecting || status === "connecting" ? "Connecting..." : "Connect wallet"}
+              </button>
+            )}
             <button className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110">
               Request a verdict
             </button>
+            {error && (
+              <p className="text-xs text-red-400">{error}</p>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Error toast */}
+      {error && status !== "connected" && (
+        <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 rounded-lg border border-red-400/20 bg-red-400/10 px-4 py-2 text-xs text-red-400 backdrop-blur-xl">
+          {error}
         </div>
       )}
     </nav>
