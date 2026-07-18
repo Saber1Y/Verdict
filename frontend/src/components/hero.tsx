@@ -1,6 +1,9 @@
 "use client";
 
+import { useVerdictDialog } from "@/lib/verdict-context";
+
 export function Hero() {
+  const { setDialogOpen } = useVerdictDialog();
   return (
     <section className="relative overflow-hidden pt-32 pb-24 md:pt-44 md:pb-32">
       {/* Ambient gradient background */}
@@ -84,7 +87,10 @@ export function Hero() {
 
           {/* CTAs */}
           <div data-aos="fade-up" data-aos-delay="500" className="mt-10 flex flex-wrap justify-center gap-4">
-            <button className="rounded-lg bg-violet px-8 py-3 text-sm font-semibold text-white transition-all hover:brightness-110">
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="rounded-lg bg-violet px-8 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
+            >
               Request a verdict
             </button>
             <button className="rounded-lg border border-card-border px-8 py-3 text-sm font-semibold transition-colors hover:border-muted">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useMidnightWallet } from "@/hooks/use-midnight-wallet";
+import { useVerdictDialog } from "@/lib/verdict-context";
 
 const NAV_LINKS = [
   { label: "How it works", href: "#how-it-works" },
@@ -13,6 +14,7 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   const { status, address, walletName, networkId, error, isConnecting, walletDetected, connect, disconnect, truncateAddress } =
     useMidnightWallet();
+  const { setDialogOpen } = useVerdictDialog();
 
   const walletPill = () => {
     if (status === "connected" && address) {
@@ -77,7 +79,10 @@ export function Nav() {
         {/* Desktop buttons */}
         <div className="hidden items-center gap-3 md:flex">
           {walletPill()}
-          <button className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110">
+          <button
+            onClick={() => setDialogOpen(true)}
+            className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110"
+          >
             Request a verdict
           </button>
         </div>
@@ -136,7 +141,10 @@ export function Nav() {
                 {isConnecting || status === "connecting" ? "Connecting..." : "Connect wallet"}
               </button>
             )}
-            <button className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110">
+            <button
+              onClick={() => { setDialogOpen(true); setOpen(false); }}
+              className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110"
+            >
               Request a verdict
             </button>
             {error && (

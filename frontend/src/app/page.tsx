@@ -7,10 +7,11 @@ import { Stats } from "@/components/stats";
 import { Proof } from "@/components/proof";
 import { Transparency } from "@/components/transparency";
 import { Footer } from "@/components/footer";
+import { PageShell } from "@/components/page-shell";
 
 export default function Home() {
   return (
-    <>
+    <PageShell>
       <Nav />
       <main className="flex-1">
         <Hero />
@@ -22,6 +23,6 @@ export default function Home() {
         <Transparency />
       </main>
       <Footer />
-    </>
+    </PageShell>
   );
 }
