@@ -1,0 +1,42 @@
+--- /dev/fd/11	2026-07-19 01:30:12
++++ /dev/fd/12	2026-07-19 01:30:12
+@@ -20,27 +20,33 @@
+   "exports": {
+     ".": {
+       "types": "./dist/index.d.ts",
+-      "import": "./dist/index.js"
++      "import": "./dist/index.js",
++      "default": "./dist/index.js"
+     },
+     "./balancer": {
+       "types": "./dist/balancer/index.d.ts",
+-      "import": "./dist/balancer/index.js"
++      "import": "./dist/balancer/index.js",
++      "default": "./dist/balancer/index.js"
+     },
+     "./submission": {
+       "types": "./dist/submission/index.d.ts",
+-      "import": "./dist/submission/index.js"
++      "import": "./dist/submission/index.js",
++      "default": "./dist/submission/index.js"
+     },
+     "./pendingTransactions": {
+       "types": "./dist/pendingTransactions/index.d.ts",
+-      "import": "./dist/pendingTransactions/index.js"
++      "import": "./dist/pendingTransactions/index.js",
++      "default": "./dist/pendingTransactions/index.js"
+     },
+     "./proving": {
+       "types": "./dist/proving/index.d.ts",
+-      "import": "./dist/proving/index.js"
++      "import": "./dist/proving/index.js",
++      "default": "./dist/proving/index.js"
+     },
+     "./simulation": {
+       "types": "./dist/simulation/index.d.ts",
+-      "import": "./dist/simulation/index.js"
++      "import": "./dist/simulation/index.js",
++      "default": "./dist/simulation/index.js"
+     }
+   },
+   "dependencies": {

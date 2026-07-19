@@ -1,0 +1,12 @@
+--- /dev/fd/11	2026-07-19 01:30:12
++++ /dev/fd/12	2026-07-19 01:30:12
+@@ -22,7 +22,8 @@
+   "exports": {
+     ".": {
+       "types": "./dist/index.d.ts",
+-      "import": "./dist/index.js"
++      "import": "./dist/index.js",
++      "default": "./dist/index.js"
+     }
+   },
+   "dependencies": {

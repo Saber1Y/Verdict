@@ -1,0 +1,30 @@
+--- /dev/fd/11	2026-07-19 01:30:13
++++ /dev/fd/12	2026-07-19 01:30:13
+@@ -23,19 +23,23 @@
+   "exports": {
+     ".": {
+       "types": "./dist/index.d.ts",
+-      "import": "./dist/index.js"
++      "import": "./dist/index.js",
++      "default": "./dist/index.js"
+     },
+     "./networking": {
+       "types": "./dist/networking/index.d.ts",
+-      "import": "./dist/networking/index.js"
++      "import": "./dist/networking/index.js",
++      "default": "./dist/networking/index.js"
+     },
+     "./types": {
+       "types": "./dist/types.d.ts",
+-      "import": "./dist/types.js"
++      "import": "./dist/types.js",
++      "default": "./dist/types.js"
+     },
+     "./testing": {
+       "types": "./dist/testing/index.d.ts",
+-      "import": "./dist/testing/index.js"
++      "import": "./dist/testing/index.js",
++      "default": "./dist/testing/index.js"
+     }
+   },
+   "dependencies": {
