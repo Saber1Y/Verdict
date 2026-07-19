@@ -254,7 +254,7 @@ async function main() {
   // The `any` casts are unavoidable: the Effect-based overloads for
   // `withWitnesses` / `withCompiledFileAssets` can't narrow union context tags
   // at the type level. The hello-world CLI avoids this via `withVacantWitnesses`.
-  const initialPrivateState: VerdictPrivateState = { balance: 0n };
+  const initialPrivateState: VerdictPrivateState = { balance };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const withWitnesses: any = CompiledContract.withWitnesses;

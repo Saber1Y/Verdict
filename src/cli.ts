@@ -96,12 +96,48 @@ async function createProviders(walletCtx: WalletContext) {
 
 // ─── Main CLI ──────────────────────────────────────────────────────────────────
 
+async function runAutoDemo(walletCtx: any, providers: any, deployed: any, contractAddress: string) {
+  const dealId = 'e2e-demo-001';
+  const threshold = 100_000n;
+  const counterparty = '0x0000000000000000000000000000000000000000';
+  const descHash = '0x0000';
+  const timestamp = BigInt(Date.now());
+
+  console.log(`─── Auto Demo: verifySolvency ──────────────────────────`);
+  console.log(`  Deal ID:       ${dealId}`);
+  console.log(`  Threshold:     ${Number(threshold).toLocaleString()} tNight`);
+  console.log(`  Counterparty:  ${counterparty}`);
+  console.log(`  Actual:        250,000,000,000,000 tNight (>> threshold → SOLVENT)\n`);
+
+  console.log('  Submitting...');
+  const tx = await deployed.callTx.verifySolvency(dealId, threshold, counterparty, timestamp, descHash);
+  console.log(`  ✅ Transaction submitted!`);
+  console.log(`  Tx ID:     ${tx.public.txId}`);
+  console.log(`  Block:     ${tx.public.blockHeight}\n`);
+
+  console.log('  Reading verdict from blockchain...');
+  const contractState = await providers.publicDataProvider.queryContractState(contractAddress);
+  if (contractState) {
+    const ledgerState = VerdictContract.ledger(contractState.data);
+    console.log(`  Deal ID:            ${ledgerState.deal_id}`);
+    console.log(`  Threshold:          ${ledgerState.threshold.toString()}`);
+    console.log(`  Verdict:            ${ledgerState.verdict_passed === 1n ? '✅ SOLVENT' : '❌ INSUFFICIENT'}`);
+    console.log(`  Counterparty:       ${ledgerState.counterparty_address}`);
+    console.log(`  Timestamp:          ${new Date(Number(ledgerState.timestamp)).toISOString()}`);
+    console.log(`  Description Hash:   ${ledgerState.description_hash}`);
+    console.log(`\n  Privacy guarantee:  Only boolean verdict_passed is stored on-chain.`);
+    console.log(`                      Actual balance is never disclosed.\n`);
+  }
+}
+
 async function main() {
+  const isAuto = process.argv.includes('--auto');
+
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
   console.log('║                   Verdict CLI                            ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
-  const rl = createInterface({ input: stdin, output: stdout });
+  const rl = isAuto ? null : createInterface({ input: stdin, output: stdout });
 
   // Check for deployment
   const deployment = getDeployment(network);
@@ -155,10 +191,18 @@ async function main() {
       compiledContract,
       contractAddress: deployment.address,
       privateStateId: PRIVATE_STATE_ID,
-      initialPrivateState: { balance: 0n },
+      initialPrivateState: { balance },
     });
 
     console.log('  ✅ Connected!\n');
+
+    if (isAuto) {
+      await runAutoDemo(walletCtx, providers, deployed, deployment.address);
+      await persistWalletState(network, walletCtx);
+      await walletCtx.wallet.stop();
+      console.log('  Done.');
+      return;
+    }
 
     // Interactive CLI loop
     let running = true;
@@ -169,14 +213,14 @@ async function main() {
       console.log('  3. Check wallet balance');
       console.log('  4. Exit\n');
 
-      const choice = await rl.question('  Your choice: ');
+      const choice = await rl!.question('  Your choice: ');
 
       switch (choice.trim()) {
         case '1': {
-          const dealId = await rl.question('  Deal ID: ');
-          const thresholdStr = await rl.question('  Threshold (balance in tNight): ');
-          const counterparty = await rl.question('  Counterparty address: ');
-          const descHash = await rl.question('  Description hash: ');
+          const dealId = await rl!.question('  Deal ID: ');
+          const thresholdStr = await rl!.question('  Threshold (balance in tNight): ');
+          const counterparty = await rl!.question('  Counterparty address: ');
+          const descHash = await rl!.question('  Description hash: ');
 
           const threshold = BigInt(thresholdStr);
           const timestamp = BigInt(Date.now());
@@ -203,7 +247,7 @@ async function main() {
         case '2': {
           console.log('\n  Reading verdict from blockchain...');
           try {
-            const contractState = await providers.publicDataProvider.queryContractState(deployment.address);
+            const contractState = await providers.publicDataProvider.queryContractState(contractAddress);
             if (contractState) {
               const ledgerState = VerdictContract.ledger(contractState.data);
               console.log(`\n  Deal ID:            ${ledgerState.deal_id}`);
@@ -246,7 +290,7 @@ async function main() {
   } catch (error) {
     console.error('\n❌ Error:', error instanceof Error ? error.message : error);
   } finally {
-    rl.close();
+    rl?.close();
   }
 }
 

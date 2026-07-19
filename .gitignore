@@ -58,3 +58,7 @@ temp/
 
 # Midnight wallet sync state (per-network serialized wallet state cache)
 .midnight-wallet-state/
+
+# Runtime data
+midnight-level-db/
+.verdict-history.json
