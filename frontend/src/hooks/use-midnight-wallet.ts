@@ -14,8 +14,31 @@ type WalletState = {
   error: string | null;
 };
 
+type SavedState = {
+  address: string;
+  shieldedAddress: string;
+  networkId: string;
+  walletName: string;
+};
+
+const STORAGE_KEY = "verdict_wallet_state";
 const POLL_INTERVAL = 300;
 const POLL_TIMEOUT = 6000;
+
+function saveWalletState(s: SavedState) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+}
+
+function loadWalletState(): SavedState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearWalletState() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
 
 /**
  * Resolve the first available Midnight wallet.
@@ -46,7 +69,7 @@ export function useMidnightWallet() {
   const [walletDetected, setWalletDetected] = useState(false);
   const connectedApiRef = useRef<ConnectedAPI | null>(null);
 
-  // Poll for wallet injection (extensions may load after the page)
+  // Poll for wallet injection (extensions may load after the page) + auto-restore
   useEffect(() => {
     if (resolveWallet()) {
       setWalletDetected(true);
@@ -63,6 +86,15 @@ export function useMidnightWallet() {
     }, POLL_INTERVAL);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-restore connection from localStorage after wallet is detected
+  useEffect(() => {
+    if (!walletDetected) return;
+    const saved = loadWalletState();
+    if (saved) {
+      connect(saved.networkId);
+    }
+  }, [walletDetected]);
 
   const connect = useCallback(async (preferredNetwork?: string) => {
     setIsConnecting(true);
@@ -111,13 +143,18 @@ export function useMidnightWallet() {
 
       connectedApiRef.current = api;
 
-      setState({
-        status: "connected",
-        connectedApi: api,
+      const walletState = {
         address: unshieldedAddress,
         shieldedAddress: shielded.shieldedAddress,
         networkId: connectionStatus.networkId,
         walletName: wallet.name,
+      };
+      saveWalletState(walletState);
+
+      setState({
+        status: "connected",
+        connectedApi: api,
+        ...walletState,
         error: null,
       });
     } catch (err) {
@@ -130,6 +167,7 @@ export function useMidnightWallet() {
 
   const disconnect = useCallback(() => {
     connectedApiRef.current = null;
+    clearWalletState();
     setState({
       status: "disconnected",
       connectedApi: null,

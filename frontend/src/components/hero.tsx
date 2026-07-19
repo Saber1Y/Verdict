@@ -18,7 +18,8 @@ export function Hero() {
             key={i}
             className="absolute h-1 w-1 rounded-full"
             style={{
-              background: i % 3 === 0 ? "#6E5BFF" : i % 3 === 1 ? "#00D4B5" : "#7A7F8E",
+              background:
+                i % 3 === 0 ? "#6E5BFF" : i % 3 === 1 ? "#00D4B5" : "#7A7F8E",
               top: `${(i * 7 + 13) % 100}%`,
               left: `${(i * 11 + 5) % 100}%`,
               animation: `atom-float ${4 + (i % 3) * 2}s ease-in-out ${i * 0.4}s infinite`,
@@ -43,14 +44,6 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-4xl text-center">
-          <span
-            data-aos="fade-down"
-            data-aos-delay="100"
-            className="mb-6 inline-block rounded-full border border-violet/20 bg-violet/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-violet"
-          >
-            Zero-knowledge agent verification
-          </span>
-
           <h1
             data-aos="fade-up"
             data-aos-delay="200"
@@ -66,11 +59,17 @@ export function Hero() {
             data-aos-delay="300"
             className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted md:text-xl"
           >
-            One agent proves it clears another agent&apos;s threshold — solvency, eligibility, whatever the deal requires — without either side, or the chain, ever seeing the real value.
+            One agent proves it clears another agent&apos;s threshold —
+            solvency, eligibility, whatever the deal requires — without either
+            side, or the chain, ever seeing the real value.
           </p>
 
           {/* Live-status pills */}
-          <div data-aos="fade-up" data-aos-delay="400" className="mt-10 flex flex-wrap justify-center gap-3">
+          <div
+            data-aos="fade-up"
+            data-aos-delay="400"
+            className="mt-10 flex flex-wrap justify-center gap-3"
+          >
             <span className="inline-flex items-center gap-2 rounded-full border border-card-border bg-card/60 px-3 py-1.5 font-mono text-xs text-muted">
               <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]"></span>
               Compact ZK circuits
@@ -86,7 +85,11 @@ export function Hero() {
           </div>
 
           {/* CTAs */}
-          <div data-aos="fade-up" data-aos-delay="500" className="mt-10 flex flex-wrap justify-center gap-4">
+          <div
+            data-aos="fade-up"
+            data-aos-delay="500"
+            className="mt-10 flex flex-wrap justify-center gap-4"
+          >
             <button
               onClick={() => setDialogOpen(true)}
               className="rounded-lg bg-violet px-8 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"

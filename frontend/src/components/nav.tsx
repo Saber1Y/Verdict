@@ -20,18 +20,23 @@ export function Nav() {
   const walletPill = () => {
     if (status === "connected" && address) {
       return (
-        <button
-          onClick={disconnect}
-          className="inline-flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm transition-colors hover:bg-teal/10"
-        >
-          <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
-          <span className="font-mono text-teal">{truncateAddress(address)}</span>
-          {networkId && networkId !== "mainnet" && (
-            <span className="rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
-              {networkId}
-            </span>
-          )}
-        </button>
+        <div className="inline-flex items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-sm">
+            <span className="h-2 w-2 rounded-full bg-teal shadow-[0_0_6px_#00D4B5]" />
+            <span className="font-mono text-teal">{truncateAddress(address)}</span>
+            {networkId && networkId !== "mainnet" && (
+              <span className="rounded border border-card-border bg-card px-1.5 py-0.5 text-[10px] uppercase text-muted">
+                {networkId}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={disconnect}
+            className="rounded-lg border border-card-border px-3 py-2 text-xs text-muted transition-colors hover:border-red-400/30 hover:text-red-400"
+          >
+            Disconnect
+          </button>
+        </div>
       );
     }
 
