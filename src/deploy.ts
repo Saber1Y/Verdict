@@ -10,7 +10,7 @@ import { resolveNetwork, getOrCreateSeed, recordDeployment } from './network';
 import { createWallet, persistWalletState, unshieldedToken, type WalletContext } from './wallet';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
-import { firstValueFrom, filter, timeout, throttleTime } from 'rxjs';
+import { firstValueFrom, filter, timeout } from 'rxjs';
 
 // Midnight SDK imports
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
@@ -169,17 +169,7 @@ async function main() {
   }
 
   if (network !== 'undeployed' && networkConfig.faucet) {
-    let initialState;
-    try {
-      initialState = await firstValueFrom(
-        walletCtx.wallet.state().pipe(
-          filter((s) => s.isSynced),
-          timeout({ first: 300_000 }),
-        ),
-      );
-    } catch {
-      initialState = await firstValueFrom(walletCtx.wallet.state());
-    }
+    const initialState = await firstValueFrom(walletCtx.wallet.state());
     const initialTNight = initialState.unshielded.balances[unshieldedToken().raw] ?? 0n;
     if (initialTNight === 0n) {
       console.log('─── Fund Wallet ────────────────────────────────────────────────\n');
@@ -214,17 +204,7 @@ async function main() {
 
   // Register for DUST.
   console.log('─── DUST Token Setup ───────────────────────────────────────────\n');
-  let dustState;
-  try {
-    dustState = await firstValueFrom(
-      walletCtx.wallet.state().pipe(
-        filter((s) => s.isSynced),
-        timeout({ first: 300_000 }),
-      ),
-    );
-  } catch {
-    dustState = await firstValueFrom(walletCtx.wallet.state());
-  }
+  const dustState = await firstValueFrom(walletCtx.wallet.state());
 
   const unregisteredUtxos = dustState.unshielded.availableCoins.filter(
     (c: any) => !c.meta?.registeredForDustGeneration,
@@ -242,13 +222,16 @@ async function main() {
 
   if (dustState.dust.balance(new Date()) === 0n) {
     console.log('  Waiting for DUST tokens...');
-    await firstValueFrom(
-      walletCtx.wallet.state().pipe(
-        throttleTime(5000),
-        filter((s) => s.isSynced),
-        filter((s) => s.dust.balance(new Date()) > 0n),
-      ),
-    );
+    try {
+      await firstValueFrom(
+        walletCtx.wallet.state().pipe(
+          filter((s) => s.dust.balance(new Date()) > 0n),
+          timeout({ first: 60_000 }),
+        ),
+      );
+    } catch {
+      console.log('  ⏳ DUST generation timed out after 60s; proceeding anyway.\n');
+    }
   }
   console.log('  DUST tokens ready!\n');
 
@@ -335,13 +318,8 @@ async function main() {
       }
 
       if (isDustShortage) {
-        const syncedOrCurrent = await firstValueFrom(
-          walletCtx.wallet.state().pipe(
-            filter((s) => s.isSynced),
-            timeout({ first: 30_000 }),
-          ),
-        ).catch(() => firstValueFrom(walletCtx.wallet.state()));
-        const dustBalance = syncedOrCurrent.dust.balance(new Date());
+        const dustState = await firstValueFrom(walletCtx.wallet.state());
+        const dustBalance = dustState.dust.balance(new Date());
         if (attempt < MAX_RETRIES) {
           if (attempt === 1) {
             console.log(`  Still generating DUST, retrying in ${RETRY_DELAY_MS / 1000}s...`);
